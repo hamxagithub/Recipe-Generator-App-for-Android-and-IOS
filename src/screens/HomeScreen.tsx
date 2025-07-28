@@ -10,8 +10,9 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Dimensions,
+  StatusBar,
 } from 'react-native';
-import { Recipe, UserPreferences } from '../types';
+import { Recipe, UserPreferences, QuickAction } from '../types';
 import { HomeScreenProps } from '../types/navigation';
 import DatabaseService from '../services/DatabaseService';
 import { formatCookingTime, searchRecipes, sortRecipes } from '../utils/recipeUtils';
@@ -25,9 +26,47 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'favorites' | 'recent'>('all');
+  const [showWelcome, setShowWelcome] = useState(true);
+
+  const quickActions: QuickAction[] = [
+    {
+      id: 'generate',
+      title: 'Create Recipe',
+      subtitle: 'From your ingredients',
+      icon: '🍳',
+      color: '#4CAF50',
+      action: 'RecipeGenerator'
+    },
+    {
+      id: 'camera',
+      title: 'Scan Ingredients',
+      subtitle: 'Take a photo',
+      icon: '📸',
+      color: '#2196F3',
+      action: 'RecipeGenerator'
+    },
+    {
+      id: 'saved',
+      title: 'My Recipes',
+      subtitle: 'View saved recipes',
+      icon: '📚',
+      color: '#FF9800',
+      action: 'SavedRecipes'
+    },
+    {
+      id: 'preferences',
+      title: 'Settings',
+      subtitle: 'Diet & preferences',
+      icon: '⚙️',
+      color: '#9C27B0',
+      action: 'Preferences'
+    }
+  ];
 
   useEffect(() => {
     loadInitialData();
+    // Hide welcome message after first use
+    setTimeout(() => setShowWelcome(false), 5000);
   }, []);
 
   useEffect(() => {
@@ -45,7 +84,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
       setRecipes(savedRecipes);
       setUserPreferences(preferences);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load recipes');
+      Alert.alert('Oops!', 'Had trouble loading your recipes. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -54,12 +93,10 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const filterRecipes = () => {
     let filtered = recipes;
 
-    // Apply search filter
     if (searchQuery.trim()) {
       filtered = searchRecipes(filtered, searchQuery);
     }
 
-    // Apply category filter
     switch (selectedFilter) {
       case 'favorites':
         filtered = filtered.filter(recipe => recipe.rating && recipe.rating >= 4);
@@ -74,140 +111,209 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
     setFilteredRecipes(filtered);
   };
 
-  const navigateToRecipeGenerator = () => {
-    navigation.navigate('RecipeGenerator');
+  const handleQuickAction = (action: string) => {
+    if (action === 'RecipeGenerator') {
+      navigation.navigate('RecipeGenerator');
+    } else {
+      navigation.navigate(action as any);
+    }
   };
 
-  const navigateToRecipeDetail = (recipe: Recipe) => {
-    navigation.navigate('RecipeDetail', { recipe });
-  };
+  const renderWelcomeCard = () => {
+    if (!showWelcome) return null;
 
-  const navigateToSavedRecipes = () => {
-    navigation.navigate('SavedRecipes');
+    return (
+      <View style={styles.welcomeCard}>
+        <View style={styles.welcomeContent}>
+          <Text style={styles.welcomeTitle}>👋 Welcome to Recipe Generator!</Text>
+          <Text style={styles.welcomeText}>
+            Turn your ingredients into delicious meals in just a few taps
+          </Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.welcomeCloseButton}
+          onPress={() => setShowWelcome(false)}
+        >
+          <Text style={styles.welcomeCloseText}>×</Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const renderQuickActions = () => (
     <View style={styles.quickActionsContainer}>
-      <TouchableOpacity
-        style={[styles.quickActionButton, styles.primaryAction]}
-        onPress={navigateToRecipeGenerator}
-      >
-        <Text style={styles.quickActionIcon}>🍳</Text>
-        <Text style={styles.quickActionText}>Generate Recipe</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.quickActionButton}
-        onPress={navigateToSavedRecipes}
-      >
-        <Text style={styles.quickActionIcon}>📚</Text>
-        <Text style={styles.quickActionText}>Saved Recipes</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.quickActionButton}
-        onPress={() => navigation.navigate('Preferences')}
-      >
-        <Text style={styles.quickActionIcon}>⚙️</Text>
-        <Text style={styles.quickActionText}>Preferences</Text>
-      </TouchableOpacity>
+      <Text style={styles.sectionTitle}>What would you like to do?</Text>
+      <View style={styles.quickActionsGrid}>
+        {quickActions.map((action) => (
+          <TouchableOpacity
+            key={action.id}
+            style={[styles.quickActionCard, { backgroundColor: action.color }]}
+            onPress={() => handleQuickAction(action.action)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.quickActionIcon}>{action.icon}</Text>
+            <Text style={styles.quickActionTitle}>{action.title}</Text>
+            <Text style={styles.quickActionSubtitle}>{action.subtitle}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 
-  const renderFilterTabs = () => (
-    <View style={styles.filterTabsContainer}>
-      {[
-        { key: 'all', label: 'All Recipes' },
-        { key: 'favorites', label: 'Favorites' },
-        { key: 'recent', label: 'Recent' }
-      ].map(tab => (
-        <TouchableOpacity
-          key={tab.key}
-          style={[
-            styles.filterTab,
-            selectedFilter === tab.key && styles.activeFilterTab
-          ]}
-          onPress={() => setSelectedFilter(tab.key as any)}
-        >
-          <Text style={[
-            styles.filterTabText,
-            selectedFilter === tab.key && styles.activeFilterTabText
-          ]}>
-            {tab.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
+  const renderSearchSection = () => (
+    <View style={styles.searchSection}>
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputWrapper}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search your recipes..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#999"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity 
+              style={styles.clearButton}
+              onPress={() => setSearchQuery('')}
+            >
+              <Text style={styles.clearButtonText}>×</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      
+      {recipes.length > 0 && (
+        <View style={styles.filterTabs}>
+          {[
+            { key: 'all', label: 'All', count: recipes.length },
+            { key: 'favorites', label: 'Favorites', count: recipes.filter(r => r.rating && r.rating >= 4).length },
+            { key: 'recent', label: 'Recent', count: Math.min(recipes.length, 10) }
+          ].map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[
+                styles.filterTab,
+                selectedFilter === tab.key && styles.activeFilterTab
+              ]}
+              onPress={() => setSelectedFilter(tab.key as any)}
+            >
+              <Text style={[
+                styles.filterTabText,
+                selectedFilter === tab.key && styles.activeFilterTabText
+              ]}>
+                {tab.label} ({tab.count})
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Easy': return '#4CAF50';
+      case 'Medium': return '#FF9800';
+      case 'Hard': return '#F44336';
+      default: return '#666';
+    }
+  };
 
   const renderRecipeCard = (recipe: Recipe) => (
     <TouchableOpacity
       key={recipe.id}
       style={styles.recipeCard}
-      onPress={() => navigateToRecipeDetail(recipe)}
+      onPress={() => navigation.navigate('RecipeDetail', { recipe })}
+      activeOpacity={0.9}
     >
-      <View style={styles.recipeCardHeader}>
-        <Text style={styles.recipeTitle} numberOfLines={2}>
-          {recipe.name}
-        </Text>
-        {recipe.rating && (
-          <View style={styles.ratingContainer}>
-            <Text style={styles.ratingText}>⭐ {recipe.rating.toFixed(1)}</Text>
+      <View style={styles.recipeCardContent}>
+        <View style={styles.recipeHeader}>
+          <View style={styles.recipeMainInfo}>
+            <Text style={styles.recipeTitle} numberOfLines={2}>
+              {recipe.name}
+            </Text>
+            {recipe.description && (
+              <Text style={styles.recipeDescription} numberOfLines={2}>
+                {recipe.description}
+              </Text>
+            )}
           </View>
-        )}
-      </View>
-      
-      {recipe.description && (
-        <Text style={styles.recipeDescription} numberOfLines={2}>
-          {recipe.description}
-        </Text>
-      )}
-
-      <View style={styles.recipeMetadata}>
-        <View style={styles.metadataItem}>
-          <Text style={styles.metadataIcon}>⏱️</Text>
-          <Text style={styles.metadataText}>{formatCookingTime(recipe.cookingTime)}</Text>
-        </View>
-        
-        <View style={styles.metadataItem}>
-          <Text style={styles.metadataIcon}>👥</Text>
-          <Text style={styles.metadataText}>{recipe.servings} servings</Text>
-        </View>
-        
-        <View style={styles.metadataItem}>
-          <Text style={styles.metadataIcon}>📊</Text>
-          <Text style={styles.metadataText}>{recipe.difficulty}</Text>
-        </View>
-      </View>
-
-      {recipe.tags.length > 0 && (
-        <View style={styles.tagsContainer}>
-          {recipe.tags.slice(0, 3).map((tag, index) => (
-            <View key={index} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
+          
+          {recipe.rating && (
+            <View style={styles.ratingBadge}>
+              <Text style={styles.ratingText}>⭐ {recipe.rating.toFixed(1)}</Text>
             </View>
-          ))}
-          {recipe.tags.length > 3 && (
-            <Text style={styles.moreTagsText}>+{recipe.tags.length - 3} more</Text>
           )}
         </View>
-      )}
+
+        <View style={styles.recipeMetrics}>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricIcon}>⏱️</Text>
+            <Text style={styles.metricText}>{formatCookingTime(recipe.cookingTime)}</Text>
+          </View>
+          
+          <View style={styles.metricItem}>
+            <Text style={styles.metricIcon}>👥</Text>
+            <Text style={styles.metricText}>{recipe.servings}</Text>
+          </View>
+          
+          <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(recipe.difficulty) }]}>
+            <Text style={styles.difficultyText}>{recipe.difficulty}</Text>
+          </View>
+        </View>
+
+        <View style={styles.ingredientsPreview}>
+          <Text style={styles.ingredientsLabel}>Main ingredients:</Text>
+          <Text style={styles.ingredientsText} numberOfLines={1}>
+            {recipe.ingredients.slice(0, 4).map(ing => ing.name).join(', ')}
+            {recipe.ingredients.length > 4 && '...'}
+          </Text>
+        </View>
+      </View>
+      
+      <View style={styles.recipeCardArrow}>
+        <Text style={styles.arrowText}>→</Text>
+      </View>
     </TouchableOpacity>
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyStateContainer}>
-      <Text style={styles.emptyStateIcon}>🍳</Text>
+      <Text style={styles.emptyStateIcon}>�️</Text>
       <Text style={styles.emptyStateTitle}>No recipes yet!</Text>
       <Text style={styles.emptyStateDescription}>
-        Start by generating your first recipe with available ingredients
+        Let's create your first recipe from ingredients you have at home
       </Text>
       <TouchableOpacity
         style={styles.emptyStateButton}
-        onPress={navigateToRecipeGenerator}
+        onPress={() => navigation.navigate('RecipeGenerator')}
       >
-        <Text style={styles.emptyStateButtonText}>Generate Recipe</Text>
+        <Text style={styles.emptyStateButtonText}>🍳 Create First Recipe</Text>
       </TouchableOpacity>
+    </View>
+  );
+
+  const renderNoResults = () => (
+    <View style={styles.noResultsContainer}>
+      <Text style={styles.noResultsIcon}>🔍</Text>
+      <Text style={styles.noResultsTitle}>No recipes found</Text>
+      <Text style={styles.noResultsDescription}>
+        {searchQuery 
+          ? `No recipes match "${searchQuery}"`
+          : selectedFilter === 'favorites' 
+            ? 'No favorite recipes yet. Rate some recipes with 4+ stars!'
+            : 'No recent recipes found'
+        }
+      </Text>
+      {searchQuery && (
+        <TouchableOpacity
+          style={styles.clearSearchButton}
+          onPress={() => setSearchQuery('')}
+        >
+          <Text style={styles.clearSearchButtonText}>Clear Search</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -224,60 +330,52 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <StatusBar backgroundColor="#4CAF50" barStyle="light-content" />
+      
+      <ScrollView 
+        style={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Recipe Generator</Text>
-          <Text style={styles.headerSubtitle}>What would you like to cook today?</Text>
+          <Text style={styles.headerSubtitle}>
+            {recipes.length > 0 
+              ? `You have ${recipes.length} recipe${recipes.length === 1 ? '' : 's'}`
+              : 'Ready to cook something amazing?'
+            }
+          </Text>
         </View>
+
+        {/* Welcome Card */}
+        {renderWelcomeCard()}
 
         {/* Quick Actions */}
         {renderQuickActions()}
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search recipes..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#666"
-          />
-          <Text style={styles.searchIcon}>🔍</Text>
-        </View>
-
-        {/* Filter Tabs */}
-        {recipes.length > 0 && renderFilterTabs()}
+        {/* Search Section */}
+        {renderSearchSection()}
 
         {/* Recipes List */}
-        <View style={styles.recipesContainer}>
+        <View style={styles.recipesSection}>
           {filteredRecipes.length > 0 ? (
             <>
-              <Text style={styles.sectionTitle}>
-                {selectedFilter === 'all' ? 'All Recipes' :
+              <Text style={styles.recipesTitle}>
+                {selectedFilter === 'all' ? 'Your Recipes' :
                  selectedFilter === 'favorites' ? 'Your Favorites' : 'Recent Recipes'}
-                {searchQuery && ` (${filteredRecipes.length} found)`}
               </Text>
               
               {filteredRecipes.map(renderRecipeCard)}
             </>
           ) : recipes.length > 0 ? (
-            <View style={styles.noResultsContainer}>
-              <Text style={styles.noResultsIcon}>🔍</Text>
-              <Text style={styles.noResultsTitle}>No recipes found</Text>
-              <Text style={styles.noResultsDescription}>
-                {searchQuery 
-                  ? `No recipes match "${searchQuery}"`
-                  : selectedFilter === 'favorites' 
-                    ? 'No favorite recipes yet'
-                    : 'No recent recipes found'
-                }
-              </Text>
-            </View>
+            renderNoResults()
           ) : (
             renderEmptyState()
           )}
         </View>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -295,32 +393,394 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f8f9fa',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+    fontWeight: '500',
   },
   header: {
-    padding: 20,
-    paddingBottom: 10,
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2c3e50',
+    color: '#fff',
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#E8F5E8',
+    opacity: 0.9,
   },
-  quickActionsContainer: {
+  
+  // Welcome Card
+  welcomeCard: {
+    backgroundColor: '#E3F2FD',
+    margin: 20,
+    marginBottom: 16,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  welcomeContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  welcomeTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1976D2',
+    marginBottom: 4,
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#1565C0',
+    lineHeight: 20,
+  },
+  welcomeCloseButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(25, 118, 210, 0.1)',
+  },
+  welcomeCloseText: {
+    fontSize: 18,
+    color: '#1976D2',
+    fontWeight: 'bold',
+  },
+
+  // Quick Actions
+  quickActionsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  quickActionCard: {
+    width: (width - 56) / 2,
+    aspectRatio: 1.2,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  quickActionIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  quickActionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  quickActionSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+  },
+
+  // Search Section
+  searchSection: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchInputWrapper: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchIcon: {
+    fontSize: 18,
+    color: '#666',
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#333',
+  },
+  clearButton: {
+    padding: 8,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+  },
+  clearButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginHorizontal: 4,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  activeFilterTab: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  filterTabText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '600',
+  },
+  activeFilterTabText: {
+    color: '#fff',
+  },
+
+  // Recipes Section
+  recipesSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  recipesTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+
+  // Recipe Cards
+  recipeCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  recipeCardContent: {
+    flex: 1,
+    padding: 16,
+  },
+  recipeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  recipeMainInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  recipeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 4,
+    lineHeight: 24,
+  },
+  recipeDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  ratingBadge: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#FFD54F',
+  },
+  ratingText: {
+    fontSize: 12,
+    color: '#F57C00',
+    fontWeight: '700',
+  },
+  recipeMetrics: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  metricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+    marginBottom: 4,
+  },
+  metricIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  metricText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  difficultyBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  difficultyText: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  ingredientsPreview: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+  },
+  ingredientsLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  ingredientsText: {
+    fontSize: 13,
+    color: '#333',
+    lineHeight: 18,
+  },
+  recipeCardArrow: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40,
+    backgroundColor: '#f8f9fa',
+  },
+  arrowText: {
+    fontSize: 18,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+
+  // Empty States
+  emptyStateContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyStateIcon: {
+    fontSize: 64,
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  emptyStateButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  emptyStateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  
+  // No Results
+  noResultsContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  noResultsIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  noResultsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noResultsDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  clearSearchButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    gap: 10,
   },
+  clearSearchButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Legacy styles to maintain compatibility
   quickActionButton: {
     flex: 1,
     backgroundColor: '#fff',
@@ -336,204 +796,16 @@ const styles = StyleSheet.create({
   primaryAction: {
     backgroundColor: '#4CAF50',
   },
-  quickActionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
   quickActionText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#2c3e50',
     textAlign: 'center',
   },
-  searchContainer: {
-    margin: 20,
-    marginTop: 10,
-    position: 'relative',
-  },
-  searchInput: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingRight: 48,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  searchIcon: {
-    position: 'absolute',
-    right: 16,
-    top: 12,
-    fontSize: 20,
-  },
-  filterTabsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 10,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  activeFilterTab: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
-  },
-  filterTabText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  activeFilterTabText: {
-    color: '#fff',
-  },
-  recipesContainer: {
-    padding: 20,
-    paddingTop: 10,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 16,
-  },
-  recipeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  recipeCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  recipeTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    flex: 1,
-    marginRight: 10,
-  },
-  ratingContainer: {
-    backgroundColor: '#f0f8ff',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  ratingText: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  recipeDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  recipeMetadata: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    gap: 16,
-  },
-  metadataItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metadataIcon: {
-    fontSize: 14,
-    marginRight: 4,
-  },
-  metadataText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-  },
-  tag: {
-    backgroundColor: '#e8f5e8',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  tagText: {
-    fontSize: 10,
-    color: '#4CAF50',
-    fontWeight: '500',
-  },
-  moreTagsText: {
-    fontSize: 10,
-    color: '#999',
-    fontStyle: 'italic',
-  },
-  emptyStateContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyStateIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyStateTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 8,
-  },
-  emptyStateDescription: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 40,
-    lineHeight: 22,
-  },
-  emptyStateButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  emptyStateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  noResultsContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  noResultsIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  noResultsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 8,
-  },
-  noResultsDescription: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+
+  // Utilities
+  bottomPadding: {
+    height: 20,
   },
 });
 

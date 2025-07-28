@@ -77,3 +77,31 @@ export interface ImageRecognitionRequest {
   imageUri: string;
   apiKey?: string; // Optional API key for external services
 }
+
+export interface UIStep {
+  id: string;
+  title: string;
+  description: string;
+  completed: boolean;
+  icon: string;
+}
+
+export interface SimpleRecipeCard {
+  id: string;
+  name: string;
+  cookingTime: number;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  servings: number;
+  mainIngredients: string[];
+  image?: string;
+  rating?: number;
+}
+
+export interface QuickAction {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+  action: string;
+}
