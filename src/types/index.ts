@@ -71,3 +71,9 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+
+export interface ImageRecognitionRequest {
+  imageUri: string;
+  apiKey?: string; // Optional API key for external services
+}
